@@ -8,15 +8,27 @@ def gcg(args, model, tokenizer, pair):
     loss_best = 10000
     
     record_dict = initial_record_dict(goal, target, curr_control, loss_best)
+    
+    print("checkpoint #3")
+
     response, if_match, if_jb_long, if_jb_short = test_wb(record_dict, goal, best_control, target, tokenizer, args.model_path, model)
+    
+    print("checkpoint #4")
+
     update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_short, best_control, loss_best)
+
+    print("checkpoint #5")
+
     log(args.log_file, record_dict)
+
+    print("checkpoint #2")
 
     indices_nonascii = get_nonascii_toks(tokenizer, device=model.device)
     _, _, init_goal_slice, init_control_slice, init_target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
     init_slices = [init_goal_slice, init_control_slice, init_target_slice]
 
     for i in range(args.steps):
+        print("checkpoint #1 ", i)
         since = time.time()
         prompt, _, goal_slice, control_slice, target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
         curr_ids = tokenizer([prompt], return_tensors="pt").input_ids

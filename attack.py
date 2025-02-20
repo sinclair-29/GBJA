@@ -86,7 +86,7 @@ if __name__ == "__main__":
     args.log_file = f"{args.savedir}_{timestamp}.json"
 
     if args.model_name == "llama2":
-        args.model_path = "./Llama-2-7b-chat-hf"
+        args.model_path = "./Llama-2-hf"
     elif args.model_name == "llama2-13b":
         args.model_path = "meta-llama/Llama-2-13b-chat-hf"
     elif args.model_name == "mistral":

@@ -71,8 +71,8 @@ def prep_model(args):
             use_auth_token=True,
             low_cpu_mem_usage=True, 
             use_cache= False,
-        ).eval()
-
+            ).eval()
+    print(f"Is CUDA available: {torch.cuda.is_available()}")
     if args.model_name in ["llama2", "llama2-13b"]:
         tokenizer.pad_token = tokenizer.unk_token
         tokenizer.padding_side = 'left'
