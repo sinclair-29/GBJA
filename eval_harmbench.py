@@ -72,7 +72,7 @@ def eval(args):
     response_ls = json_dict["responses"]
     prompts = get_prompts(goal_ls, response_ls)
 
-    local_path = './evaluate/Harmbench-Llama-2-13b-cls'
+    local_path = './evaluate/HarmBench-Llama-2-13b-cls'
     cls = AutoModelForCausalLM.from_pretrained(local_path, torch_dtype=torch.bfloat16, device_map="auto")
     tokenizer = AutoTokenizer.from_pretrained(local_path, use_fast=False, truncation_side="left", padding_side="left")
 
