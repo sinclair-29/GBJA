@@ -46,6 +46,7 @@ def get_pairs(data_file="./data/advbench/harmful_behaviors.csv",
     with open(data_file, 'r') as f:
         reader = csv.reader(f)
         pairs = []
+        # ignore the first title line
         next(reader)
         for i, line in enumerate(reader):
             goal = line[0]
@@ -67,12 +68,14 @@ def prep_model(args):
             args.model_path,
             device_map="auto",
             torch_dtype=torch.float16,
+        # LLM use fl16 to ensure speed fast.
             trust_remote_code=True,
             use_auth_token=True,
             low_cpu_mem_usage=True, 
             use_cache= False,
             ).eval()
     print(f"Is CUDA available: {torch.cuda.is_available()}")
+    # 填充？
     if args.model_name in ["llama2", "llama2-13b"]:
         tokenizer.pad_token = tokenizer.unk_token
         tokenizer.padding_side = 'left'

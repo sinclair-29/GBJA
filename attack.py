@@ -42,6 +42,7 @@ if __name__ == "__main__":
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
+    # 确保实验结果的可浮现性
     cudnn.benchmark = False
     cudnn.deterministic = True
     
@@ -94,3 +95,5 @@ if __name__ == "__main__":
     
     
     main(args)
+
+# attack.py --model_name ${model} --method ${method} --data_index ${ind} --savedir ${savedir} --seed ${seed}
