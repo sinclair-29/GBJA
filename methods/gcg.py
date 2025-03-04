@@ -20,15 +20,13 @@ def gcg(args, model, tokenizer, pair):
     for i in range(args.steps):
         since = time.time()
         prompt, _, goal_slice, control_slice, target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
-        # curr_ids Shape: (batch_size, sequence_size)
+        # curr_ids Shape: (batch_size, sequence_size) （1, L）L = len(goal) + len(adv_prompt) + len(target)
         curr_ids = tokenizer([prompt], return_tensors="pt").input_ids
         # grad Shape: (control_size, vocab_size)
         grad = token_gradients(model, curr_ids[0].to(model.device), control_slice, target_slice)
         
         c_cands_sample = 0
         while True:
-            print("len control_toks: ", len(curr_ids[0, control_slice]))
-            print("len batch_size:", args.batch_size*(c_cands_sample+1))
             cands_ids = sample_control(tokenizer, curr_ids[0, control_slice], grad, 
                                         batch_size=args.batch_size*(c_cands_sample+1), topk=args.topk*(c_cands_sample+1), indices_nonascii=indices_nonascii)
             cands = get_filtered_cands(tokenizer, cands_ids, True, curr_control, goal, target, args.model_path, init_slices)

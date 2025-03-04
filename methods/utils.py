@@ -155,19 +155,33 @@ def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, a
 
 
 def sample_control(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False, indices_nonascii=None):
+    """
+
+    control_toks shape : (control_size)
+    """
+
     if not allow_non_ascii:
         grad[:, indices_nonascii] = np.infty
+    # top_indices shape: (control_size, k)
     top_indices = (-grad).topk(topk, dim=1).indices
     control_toks = control_toks.to(grad.device)
+    # original_control_toks shape: (len(control_toks) \times num_per_pos, control_size) or
+    #                              (batch_size, control_size)
     original_control_toks = control_toks.repeat(batch_size, 1)
     assert batch_size % len(control_toks) == 0
     num_per_pos = batch_size // len(control_toks)
-    new_token_pos = torch.arange(len(control_toks))[:, None].repeat(1, num_per_pos).view(-1).to(grad.device)
+    # new_token_pos shape: (len(control_toks) \times num_per_pos)
+    # [0, 1, 2, 3, ..., 20]
+    new_token_pos = torch.arange(len(control_toks)).unsqueeze(1).repeat(1, num_per_pos).view(-1).to(grad.device)
 
     new_token_val = torch.gather(
-        top_indices[new_token_pos], 1, 
-        torch.cat([torch.randperm(topk)[:num_per_pos] for _ in range(len(control_toks))], dim=0)[:, None].to(grad.device)
+        top_indices[new_token_pos], 1,
+        # index shape: (len(control_toks) \times num_per_pos, 1)
+        # randomly sample new tokens from top k elements with the largest negative gradients as substitution
+        torch.cat([torch.randperm(topk)[:num_per_pos] for _ in range(len(control_toks))], dim=0).unsqueeze(1).to(grad.device)
     )
+    # new_control_toks shape: (batch_size, control_size)
+    # shape same as original_control_toks
     new_control_toks = original_control_toks.scatter_(1, new_token_pos.unsqueeze(-1), new_token_val)
     return new_control_toks
 
@@ -182,6 +196,7 @@ def get_cand_losses(input_ids, control_slice, target_slice, cands, tokenizer, mo
     while pad_tok in input_ids or any([pad_tok in ids for ids in test_ids]):
         pad_tok += 1
     nested_ids = torch.nested.nested_tensor(test_ids)
+    # test_ids shape: (len(cands), maxlen)
     test_ids = torch.nested.to_padded_tensor(nested_ids, pad_tok, (len(test_ids), max_len))
 
     locs = torch.arange(control_slice.start, control_slice.stop).repeat(test_ids.shape[0], 1).to(input_ids.device)
