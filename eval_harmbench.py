@@ -74,6 +74,7 @@ def eval(args):
 
     local_path = './evaluate/HarmBench-Llama-2-13b-cls'
     cls = AutoModelForCausalLM.from_pretrained(local_path, torch_dtype=torch.bfloat16, device_map="auto")
+    # 指定文本的截断策略
     tokenizer = AutoTokenizer.from_pretrained(local_path, use_fast=False, truncation_side="left", padding_side="left")
 
 

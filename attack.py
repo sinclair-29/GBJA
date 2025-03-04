@@ -89,7 +89,7 @@ if __name__ == "__main__":
     if args.model_name == "llama2":
         args.model_path = "./Llama-2-hf"
     elif args.model_name == "llama2-13b":
-        args.model_path = "meta-llama/Llama-2-13b-chat-hf"
+        args.model_path = "./Llama-2-13b-chat-hf"
     elif args.model_name == "mistral":
         args.model_path = "mistralai/Mistral-7B-Instruct-v0.2"
     

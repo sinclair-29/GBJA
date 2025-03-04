@@ -43,10 +43,15 @@ def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
 def get_pairs(data_file="./data/advbench/harmful_behaviors.csv", 
               control_init = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
               here=False):
+    """
+
+    Return: List of pairs
+    Each pair is a list and contains three elements, namely, goal, initial control and target.
+    """
     with open(data_file, 'r') as f:
         reader = csv.reader(f)
         pairs = []
-        # ignore the first title line
+        # ignore the title line
         next(reader)
         for i, line in enumerate(reader):
             goal = line[0]
@@ -83,8 +88,11 @@ def prep_model(args):
 
 def token_gradients(model, input_ids, control_slice, target_slice):
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
+    # extract the weight of embedding layer
+    # Shape: [vocab_size, embedding_size]
     embed_weights = model.model.embed_tokens.weight
-        
+
+    # one_hot Shape [control_size, vocab_size]
     one_hot = torch.zeros(
         input_ids[control_slice].shape[0],
         embed_weights.shape[0],
@@ -96,9 +104,14 @@ def token_gradients(model, input_ids, control_slice, target_slice):
         input_ids[control_slice].unsqueeze(1),
         torch.ones(one_hot.shape[0], 1, device=model.device, dtype=embed_weights.dtype)
     )
+    # unsqueeze input_idx shape: (L, ) -> (1, L)
+    # embed_tokens convert ID into corresponding word embedding
+    # detach() is used to separate the tensor, makes it have no affect on gradient calculation
+    # embeds shape: [1, L, E]
     embeds = model.model.embed_tokens(input_ids.unsqueeze(0)).detach()
 
     one_hot.requires_grad_()
+    # input_embeds shape: [1, control_size, E]
     input_embeds = (one_hot @ embed_weights).unsqueeze(0)
     
     full_embeds = torch.cat(
@@ -265,6 +278,14 @@ def update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_s
 
 def test_wb(record_dict, goal, control, target, tokenizer, model_path, model,max_new_tokens=512):
     prompt, _, _, _, _ = get_prompt(goal, control, "", tokenizer, model_path)
+    ''' tokenizer 期望的输入格式是列表，返回的张量类型是pytorch
+    inputs_test 是字典：
+    {
+        'input_ids' : tensor() batch_size \times sequence_length 
+        'attention_mask' : 
+    }
+    
+    '''
     inputs_test = tokenizer([prompt], return_tensors="pt").to(model.device)
     response = model.generate(**inputs_test,
                                 do_sample=False,

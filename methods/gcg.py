@@ -18,10 +18,11 @@ def gcg(args, model, tokenizer, pair):
     init_slices = [init_goal_slice, init_control_slice, init_target_slice]
 
     for i in range(args.steps):
-        print("checkpoint #1 ", i)
         since = time.time()
         prompt, _, goal_slice, control_slice, target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
+        # curr_ids Shape: (batch_size, sequence_size)
         curr_ids = tokenizer([prompt], return_tensors="pt").input_ids
+        # grad Shape:
         grad = token_gradients(model, curr_ids[0].to(model.device), control_slice, target_slice)
         
         c_cands_sample = 0
