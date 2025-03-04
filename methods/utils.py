@@ -89,10 +89,10 @@ def prep_model(args):
 def token_gradients(model, input_ids, control_slice, target_slice):
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
     # extract the weight of embedding layer
-    # Shape: [vocab_size, embedding_size]
+    # Shape: (vocab_size, embedding_size)
     embed_weights = model.model.embed_tokens.weight
 
-    # one_hot Shape [control_size, vocab_size]
+    # one_hot Shape (control_size, vocab_size)
     one_hot = torch.zeros(
         input_ids[control_slice].shape[0],
         embed_weights.shape[0],
@@ -107,11 +107,11 @@ def token_gradients(model, input_ids, control_slice, target_slice):
     # unsqueeze input_idx shape: (L, ) -> (1, L)
     # embed_tokens convert ID into corresponding word embedding
     # detach() is used to separate the tensor, makes it have no affect on gradient calculation
-    # embeds shape: [1, L, E]
+    # embeds shape: (1, L, E)
     embeds = model.model.embed_tokens(input_ids.unsqueeze(0)).detach()
 
     one_hot.requires_grad_()
-    # input_embeds shape: [1, control_size, E]
+    # input_embeds shape: (1, control_size, E)
     input_embeds = (one_hot @ embed_weights).unsqueeze(0)
     
     full_embeds = torch.cat(
@@ -126,7 +126,8 @@ def token_gradients(model, input_ids, control_slice, target_slice):
     targets = input_ids[target_slice]
     loss_none = F.cross_entropy(logits[0,loss_slice,:], targets, reduction="none")
     loss = loss_none.mean()
-    grad = torch.autograd.grad(loss, [one_hot, ])[0].data
+    # torch.autograd.grad returns a tuple
+    grad = torch.autograd.grad(loss, one_hot, retain_graph=True)[0].detach()
     return grad
     
 def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False, indices_nonascii=None):
