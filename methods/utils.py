@@ -43,11 +43,7 @@ def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
 def get_pairs(data_file="./data/advbench/harmful_behaviors.csv", 
               control_init = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
               here=False):
-    """
-
-    Return: List of pairs
-    Each pair is a list and contains three elements, namely, goal, initial control and target.
-    """
+    """Get the pairs of malicious query, initial adversarial prompt and target output."""
     with open(data_file, 'r') as f:
         reader = csv.reader(f)
         pairs = []
@@ -80,13 +76,13 @@ def prep_model(args):
             use_cache= False,
             ).eval()
     print(f"Is CUDA available: {torch.cuda.is_available()}")
-    # 填充？
     if args.model_name in ["llama2", "llama2-13b"]:
         tokenizer.pad_token = tokenizer.unk_token
         tokenizer.padding_side = 'left'
     return model, tokenizer
 
 def token_gradients(model, input_ids, control_slice, target_slice):
+
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
     # extract the weight of embedding layer
     # Shape: (vocab_size, embedding_size)
@@ -294,14 +290,10 @@ def update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_s
 
 def test_wb(record_dict, goal, control, target, tokenizer, model_path, model,max_new_tokens=512):
     prompt, _, _, _, _ = get_prompt(goal, control, "", tokenizer, model_path)
-    ''' tokenizer 期望的输入格式是列表，返回的张量类型是pytorch
-    inputs_test 是字典：
-    {
-        'input_ids' : tensor() batch_size \times sequence_length 
-        'attention_mask' : 
-    }
-    
-    '''
+   """
+   
+   """
+
     inputs_test = tokenizer([prompt], return_tensors="pt").to(model.device)
     response = model.generate(**inputs_test,
                                 do_sample=False,
