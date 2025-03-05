@@ -18,13 +18,13 @@ else
     end=0
 fi
 
-start_time=$(data +%s)
+start_time=$(date +%s)
 for ind in $(seq 0 $end)
 do
 savedir="${savepath}/${result_name}_ind${ind}"
 echo "currently execute exp ${ind}"
 python3 attack.py --model_name ${model} --method ${method} --data_index ${ind} --savedir ${savedir} --seed ${seed}
 done
-finish_time=$(data +%s)
+finish_time=$(date +%s)
 running_time=$((finish_time - start_time))
 echo "execution time: $running_time seconds"
