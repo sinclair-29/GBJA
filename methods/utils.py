@@ -290,9 +290,6 @@ def update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_s
 
 def test_wb(record_dict, goal, control, target, tokenizer, model_path, model,max_new_tokens=512):
     prompt, _, _, _, _ = get_prompt(goal, control, "", tokenizer, model_path)
-   """
-   
-   """
 
     inputs_test = tokenizer([prompt], return_tensors="pt").to(model.device)
     response = model.generate(**inputs_test,
