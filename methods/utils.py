@@ -82,6 +82,11 @@ def prep_model(args):
     return model, tokenizer
 
 def token_gradients(model, input_ids, control_slice, target_slice):
+    """ Calculate the gradient of loss with respect to current adversarial prompt.
+
+    Return:
+        a tensor with shape (control_size, vocab_size) denotes the gradient.
+    """
 
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
     # extract the weight of embedding layer
@@ -151,9 +156,7 @@ def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, a
 
 
 def sample_control(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False, indices_nonascii=None):
-    """
-
-    control_toks shape : (control_size)
+    """ Sample new tokens from top-k negative gradient averagely.
     """
 
     if not allow_non_ascii:
@@ -178,6 +181,7 @@ def sample_control(tokenizer, control_toks, grad, batch_size, topk, allow_non_as
     )
     # new_control_toks shape: (batch_size, control_size)
     # shape same as original_control_toks
+    # 对adv prompt的每个位置都要采样一次。
     new_control_toks = original_control_toks.scatter_(1, new_token_pos.unsqueeze(-1), new_token_val)
     return new_control_toks
 
