@@ -20,7 +20,7 @@ def gcg(args, model, tokenizer, pair):
     for i in range(args.steps):
         since = time.time()
         prompt, _, goal_slice, control_slice, target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
-        # curr_ids Shape: (batch_size, sequence_size) （1, L）L = len(goal) + len(adv_prompt) + len(target)
+        # curr_ids Shape: (1, sequence_size) （1, L）L = len(goal) + len(adv_prompt) + len(target)
         curr_ids = tokenizer([prompt], return_tensors="pt").input_ids
         # grad Shape: (control_size, vocab_size)
         grad = token_gradients(model, curr_ids[0].to(model.device), control_slice, target_slice)
@@ -34,7 +34,8 @@ def gcg(args, model, tokenizer, pair):
                 break
             else:
                 c_cands_sample += 1
-                print("cands == None")
+                if args.log_intermediate:
+                    print("cands == None")
             
         losses = get_cand_losses(curr_ids[0].to(model.device), control_slice, target_slice, cands, tokenizer, model)
         curr_control = cands[losses.argmin()]
@@ -42,8 +43,9 @@ def gcg(args, model, tokenizer, pair):
         if loss_cur < loss_best:
             best_control = curr_control
             loss_best = loss_cur
-        print("Step {}, Current Loss {:.4f}, Best Loss {:.4f}, Time {:.1f}".format(i, loss_cur, loss_best, time.time() - since))
-        print(curr_control)
+        if args.log_intermediate:
+            print("Step {}, Current Loss {:.4f}, Best Loss {:.4f}, Time {:.1f}".format(i, loss_cur, loss_best, time.time() - since))
+            print(curr_control)
         del cands_ids ; gc.collect()
         update_record_dict_train(record_dict, curr_control, best_control, loss_cur, loss_best)
         if (i+1) % 50 == 0:

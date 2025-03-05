@@ -13,7 +13,7 @@ else
 fi
 
 if [[ "${method}" == *"gcgens"* ]]; then
-    end=0
+    end=10
 else
     end=0
 fi

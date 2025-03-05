@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--method", type=str, default="gcg")
+    parser.add_argument("--log_intermediate", action='store_true')
 
     args = parser.parse_args()
 
