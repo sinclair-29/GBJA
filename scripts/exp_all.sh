@@ -7,6 +7,6 @@ models=(llama2 llama2-13b mistral)
 # 循环遍历所有的method和model组合，并执行命令
 for method in "${methods[@]}"; do
   for model in "${models[@]}"; do
-    bash -c "method=${method} model=${model} seed=${seed} bash scripts/exp.sh"
+    bash -c "method=${method} model=${model} seed=${seed} log_intermediate=${log_intermediate} bash scripts/exp.sh"
   done
 done
