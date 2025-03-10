@@ -23,7 +23,7 @@ for ind in $(seq 0 $end)
 do
 savedir="${savepath}/${result_name}_ind${ind}"
 echo "currently execute exp ${ind}"
-if [ "$log_intermediate" = true ] then
+if [ "$log_intermediate" = true ]; then
     python3 attack.py --model_name ${model} --method ${method} --data_index ${ind} --savedir ${savedir} --seed ${seed} --log_intermediate
 else 
     python3 attack.py --model_name ${model} --method ${method} --data_index ${ind} --savedir ${savedir} --seed ${seed} 
