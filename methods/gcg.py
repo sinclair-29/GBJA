@@ -12,7 +12,6 @@ def gcg(args, model, tokenizer, pair):
     update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_short, best_control, loss_best)
     log(args.log_file, record_dict)
 
-
     indices_nonascii = get_nonascii_toks(tokenizer, device=model.device)
     _, _, init_goal_slice, init_control_slice, init_target_slice = get_prompt(goal, curr_control, target, tokenizer, args.model_path)
     init_slices = [init_goal_slice, init_control_slice, init_target_slice]
