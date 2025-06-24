@@ -14,6 +14,7 @@ import numpy as np
 import gc
 from .test_prefixes import _test_prefixes, _test_prefixes_short
 
+
 def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
     if "Llama-2" in model_path or "Mistral" in model_path:
         prompt = "[INST] <<SYS>>\nYou are a helpful assistant.\n <<SYS>>\n\n"
@@ -38,19 +39,16 @@ def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
         _target_slice = slice(_assistant_role_slice.stop, len(toks))
     else:
         raise RuntimeError("check model_path")
-    #print("=================================")
-    #print(prompt)
-    #print("=================================")
     return prompt, toks, _goal_slice, _control_slice, _target_slice
 
-def get_pairs(data_file="./data/advbench/harmful_behaviors.csv", 
-              control_init = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
+
+
+def get_pairs(data_file="./data/advbench/harmful_behaviors.csv",
+              control_init="! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !",
               here=False):
-    """Get the pairs of malicious query, initial adversarial prompt and target output."""
     with open(data_file, 'r') as f:
         reader = csv.reader(f)
         pairs = []
-        # ignore the title line
         next(reader)
         for i, line in enumerate(reader):
             goal = line[0]
@@ -60,43 +58,35 @@ def get_pairs(data_file="./data/advbench/harmful_behaviors.csv",
             pairs.append([goal, control_init, target])
     return pairs
 
+
 def prep_model(args):
     tokenizer = AutoTokenizer.from_pretrained(
-            args.model_path,
-            trust_remote_code=True,
-            use_auth_token=True,
-            use_fast=False,
-        )
+        args.model_path,
+        trust_remote_code=True,
+        use_auth_token=True,
+        use_fast=False,
+    )
 
     model = AutoModelForCausalLM.from_pretrained(
-            args.model_path,
-            device_map="auto",
-            torch_dtype=torch.float16,
-        # LLM use fl16 to ensure speed fast.
-            trust_remote_code=True,
-            use_auth_token=True,
-            low_cpu_mem_usage=True, 
-            use_cache= False,
-            ).eval()
-    print(f"Is CUDA available: {torch.cuda.is_available()}")
+        args.model_path,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        trust_remote_code=True,
+        use_auth_token=True,
+        low_cpu_mem_usage=True,
+        use_cache=False,
+    ).eval()
+
     if args.model_name in ["llama2", "llama2-13b"]:
         tokenizer.pad_token = tokenizer.unk_token
         tokenizer.padding_side = 'left'
     return model, tokenizer
 
+
 def token_gradients(model, input_ids, control_slice, target_slice):
-    """ Calculate the gradient of loss with respect to current adversarial prompt.
-
-    Return:
-        a tensor with shape (control_size, vocab_size) denotes the gradient.
-    """
-
-    loss_slice = slice(target_slice.start-1, target_slice.stop-1)
-    # extract the weight of embedding layer
-    # Shape: (vocab_size, embedding_size)
+    loss_slice = slice(target_slice.start - 1, target_slice.stop - 1)
     embed_weights = model.model.embed_tokens.weight
 
-    # one_hot Shape (control_size, vocab_size)
     one_hot = torch.zeros(
         input_ids[control_slice].shape[0],
         embed_weights.shape[0],
@@ -108,34 +98,29 @@ def token_gradients(model, input_ids, control_slice, target_slice):
         input_ids[control_slice].unsqueeze(1),
         torch.ones(one_hot.shape[0], 1, device=model.device, dtype=embed_weights.dtype)
     )
-    # unsqueeze input_idx shape: (L, ) -> (1, L)
-    # embed_tokens convert ID into corresponding word embedding
-    # detach() is used to separate the tensor, makes it have no affect on gradient calculation
-    # embeds shape: (1, L, E)
     embeds = model.model.embed_tokens(input_ids.unsqueeze(0)).detach()
 
     one_hot.requires_grad_()
-    # input_embeds shape: (1, control_size, E)
     input_embeds = (one_hot @ embed_weights).unsqueeze(0)
-    
+
     full_embeds = torch.cat(
         [
-            embeds[:,:control_slice.start,:], 
-            input_embeds, 
-            embeds[:,control_slice.stop:,:]
-        ], 
+            embeds[:, :control_slice.start, :],
+            input_embeds,
+            embeds[:, control_slice.stop:, :]
+        ],
         dim=1)
-    
+
     logits = model(inputs_embeds=full_embeds).logits
     targets = input_ids[target_slice]
-    loss_none = F.cross_entropy(logits[0,loss_slice,:], targets, reduction="none")
+    loss_none = F.cross_entropy(logits[0, loss_slice, :], targets, reduction="none")
     loss = loss_none.mean()
-    # torch.autograd.grad returns a tuple
-    grad = torch.autograd.grad(loss, one_hot, retain_graph=True)[0].detach()
+    grad = torch.autograd.grad(loss, [one_hot, ])[0].data
     return grad
-    
-def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False, indices_nonascii=None):
-    
+
+
+def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False,
+                              indices_nonascii=None):
     if not allow_non_ascii:
         grad[:, indices_nonascii] = np.infty
 
@@ -149,9 +134,9 @@ def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, a
     new_token_pos = new_token_pos.repeat(batch_size)
 
     new_token_val = torch.gather(
-        top_indices[new_token_pos], 1, 
+        top_indices[new_token_pos], 1,
         torch.randint(0, topk, (batch_size, 1),
-        device=grad.device)
+                      device=grad.device)
     )
     new_control_toks = original_control_toks.scatter_(1, new_token_pos.unsqueeze(-1), new_token_val)
 
@@ -159,37 +144,25 @@ def sample_control_autoprompt(tokenizer, control_toks, grad, batch_size, topk, a
 
 
 def sample_control(tokenizer, control_toks, grad, batch_size, topk, allow_non_ascii=False, indices_nonascii=None):
-    """ Sample new tokens from top-k negative gradient averagely.
-    """
-
     if not allow_non_ascii:
         grad[:, indices_nonascii] = np.infty
-    # top_indices shape: (control_size, k)
     top_indices = (-grad).topk(topk, dim=1).indices
     control_toks = control_toks.to(grad.device)
-    # original_control_toks shape: (len(control_toks) \times num_per_pos, control_size) or
-    #                              (batch_size, control_size)
     original_control_toks = control_toks.repeat(batch_size, 1)
     assert batch_size % len(control_toks) == 0
     num_per_pos = batch_size // len(control_toks)
-    # new_token_pos shape: (len(control_toks) \times num_per_pos)
-    # [0, 1, 2, 3, ..., 20]
-    new_token_pos = torch.arange(len(control_toks)).unsqueeze(1).repeat(1, num_per_pos).view(-1).to(grad.device)
+    new_token_pos = torch.arange(len(control_toks))[:, None].repeat(1, num_per_pos).view(-1).to(grad.device)
 
     new_token_val = torch.gather(
         top_indices[new_token_pos], 1,
-        # index shape: (len(control_toks) \times num_per_pos, 1)
-        # randomly sample new tokens from top k elements with the largest negative gradients as substitution
-        torch.cat([torch.randperm(topk)[:num_per_pos] for _ in range(len(control_toks))], dim=0).unsqueeze(1).to(grad.device)
+        torch.cat([torch.randperm(topk)[:num_per_pos] for _ in range(len(control_toks))], dim=0)[:, None].to(
+            grad.device)
     )
-    # new_control_toks shape: (batch_size, control_size)
-    # shape same as original_control_toks
-    # 对adv prompt的每个位置都要采样一次。
     new_control_toks = original_control_toks.scatter_(1, new_token_pos.unsqueeze(-1), new_token_val)
     return new_control_toks
 
-def get_cand_losses(input_ids, control_slice, target_slice, cands, tokenizer, model):
 
+def get_cand_losses(input_ids, control_slice, target_slice, cands, tokenizer, model):
     max_len = control_slice.stop - control_slice.start
     test_ids = [
         torch.tensor(tokenizer(control, add_special_tokens=False).input_ids[:max_len], device=input_ids.device)
@@ -199,34 +172,35 @@ def get_cand_losses(input_ids, control_slice, target_slice, cands, tokenizer, mo
     while pad_tok in input_ids or any([pad_tok in ids for ids in test_ids]):
         pad_tok += 1
     nested_ids = torch.nested.nested_tensor(test_ids)
-    # test_ids shape: (len(cands), maxlen)
     test_ids = torch.nested.to_padded_tensor(nested_ids, pad_tok, (len(test_ids), max_len))
 
     locs = torch.arange(control_slice.start, control_slice.stop).repeat(test_ids.shape[0], 1).to(input_ids.device)
     ids = torch.scatter(
-            input_ids.unsqueeze(0).repeat(test_ids.shape[0], 1),
-            1,
-            locs,
-            test_ids
-        )
+        input_ids.unsqueeze(0).repeat(test_ids.shape[0], 1),
+        1,
+        locs,
+        test_ids
+    )
     if pad_tok >= 0:
         attn_mask = (ids != pad_tok).type(ids.dtype)
     else:
         attn_mask = None
-    
-    loss_slice = slice(target_slice.start-1, target_slice.stop-1)
+
+    loss_slice = slice(target_slice.start - 1, target_slice.stop - 1)
     with torch.no_grad():
         outputs = model(input_ids=ids, attention_mask=attn_mask)
     logits = outputs.logits
     logits_for_loss = logits[:, loss_slice, :]
-    losses_none = F.cross_entropy(logits_for_loss.transpose(1,2), ids[:, target_slice], reduction="none")
+    losses_none = F.cross_entropy(logits_for_loss.transpose(1, 2), ids[:, target_slice], reduction="none")
     losses = losses_none.mean(1)
     return losses
+
 
 def remove_backward_hooks(model):
     for name, module in model.named_modules():
         if len(module._backward_hooks) > 0:
             module._backward_hooks.clear()
+
 
 def remove_forward_hooks(model):
     for name, module in model.named_modules():
@@ -239,8 +213,10 @@ def get_filtered_cands(tokenizer, control_cand, filter_cand, curr_control, goal,
     for i in range(control_cand.shape[0]):
         decoded_str = tokenizer.decode(control_cand[i], skip_special_tokens=True)
         if filter_cand:
-            if decoded_str != curr_control and len(tokenizer(decoded_str, add_special_tokens=False).input_ids) == len(control_cand[i]):
-                _, _, goal_slice, control_slice, target_slice = get_prompt(goal, decoded_str, target, tokenizer, model_path)
+            if decoded_str != curr_control and len(tokenizer(decoded_str, add_special_tokens=False).input_ids) == len(
+                    control_cand[i]):
+                _, _, goal_slice, control_slice, target_slice = get_prompt(goal, decoded_str, target, tokenizer,
+                                                                           model_path)
                 if goal_slice == init_slices[0] and control_slice == init_slices[1] and target_slice == init_slices[2]:
                     cands.append(decoded_str)
                 else:
@@ -249,7 +225,7 @@ def get_filtered_cands(tokenizer, control_cand, filter_cand, curr_control, goal,
                 count += 1
         else:
             cands.append(decoded_str)
-    
+
     if filter_cand:
         if len(cands) != 0:
             cands = cands + [cands[-1]] * (len(control_cand) - len(cands))
@@ -257,12 +233,14 @@ def get_filtered_cands(tokenizer, control_cand, filter_cand, curr_control, goal,
             return None
     return cands
 
+
 def log(log_file, save_dict):
     with open(log_file, "w") as f:
         json.dump(save_dict, f, indent=4)
 
+
 def initial_record_dict(goal, target, control_init, loss_init):
-    record_dict = {"params": {"goals": [goal] if not isinstance(goal, list) else goal, 
+    record_dict = {"params": {"goals": [goal] if not isinstance(goal, list) else goal,
                               "targets": [target]} if not isinstance(target, list) else goal,
                    "controls": [],
                    "losses": [],
@@ -279,11 +257,13 @@ def initial_record_dict(goal, target, control_init, loss_init):
                    }
     return record_dict
 
+
 def update_record_dict_train(record_dict, curr_control, best_control, loss_cur, loss_best):
     record_dict["curr_controls"].append(curr_control)
     record_dict["curr_losses"].append(loss_cur)
     record_dict["best_controls"].append(best_control)
     record_dict["best_losses"].append(loss_best)
+
 
 def update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_short, best_control, loss_best):
     record_dict["responses"].append(response)
@@ -292,23 +272,20 @@ def update_record_dict_test(record_dict, response, if_match, if_jb_long, if_jb_s
     record_dict["if_jb_short"].append(if_jb_short)
     record_dict["controls"].append(best_control)
     record_dict["losses"].append(loss_best)
-    
 
 
-def test_wb(record_dict, goal, control, target, tokenizer, model_path, model,max_new_tokens=512):
+def test_wb(record_dict, goal, control, target, tokenizer, model_path, model, max_new_tokens=512):
     prompt, _, _, _, _ = get_prompt(goal, control, "", tokenizer, model_path)
-
     inputs_test = tokenizer([prompt], return_tensors="pt").to(model.device)
     response = model.generate(**inputs_test,
-                                do_sample=False,
-                                max_new_tokens=max_new_tokens)[0]
+                              do_sample=False,
+                              max_new_tokens=max_new_tokens)[0]
     response = tokenizer.decode(
-        response[len(inputs_test["input_ids"][0]) :], skip_special_tokens=True, spaces_between_special_tokens=False
+        response[len(inputs_test["input_ids"][0]):], skip_special_tokens=True, spaces_between_special_tokens=False
     )
 
     if_match = (target in response)
     if_jb_long = not any([prefix in response for prefix in _test_prefixes])
     if_jb_short = not any([prefix in response for prefix in _test_prefixes_short])
-    
-    return response, if_match, if_jb_long, if_jb_short
 
+    return response, if_match, if_jb_long, if_jb_short
