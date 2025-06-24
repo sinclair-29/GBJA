@@ -38,6 +38,9 @@ def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
         _target_slice = slice(_assistant_role_slice.stop, len(toks))
     else:
         raise RuntimeError("check model_path")
+    print("=================================")
+    print(prompt)
+    print("=================================")
     return prompt, toks, _goal_slice, _control_slice, _target_slice
 
 def get_pairs(data_file="./data/advbench/harmful_behaviors.csv", 
