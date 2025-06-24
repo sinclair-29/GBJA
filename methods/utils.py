@@ -16,10 +16,10 @@ from .test_prefixes import _test_prefixes, _test_prefixes_short
 
 def get_prompt(goal, control, target, tokenizer, model_path, sep=None):
     if "Llama-2" in model_path or "Mistral" in model_path:
-        prompt = "[INST]"
+        prompt = "[INST] <<SYS>>\nYou are a helpful assistant.\n <<SYS>>\n\n"
         toks = tokenizer(prompt).input_ids
         _user_role_slice = slice(None, len(toks))
-        prompt += f" {goal}"
+        prompt += f"{goal}"
         toks = tokenizer(prompt).input_ids
         _goal_slice = slice(_user_role_slice.stop, len(toks))
         seperator = " " if control else ""
