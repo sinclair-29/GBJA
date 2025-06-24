@@ -81,8 +81,9 @@ def gcg_combine(args, model, tokenizer, pair):
             best_control = curr_control
             loss_best = loss_cur
         if args.log_intermediate:
-            print("Step {}, Current Loss {:.4f}, Best Loss {:.4f}, Time {:.1f}".format(i, loss_cur, loss_best, time.time() - since))
-            print(curr_control)
+            pass
+            #print("Step {}, Current Loss {:.4f}, Best Loss {:.4f}, Time {:.1f}".format(i, loss_cur, loss_best, time.time() - since))
+            #print(curr_control)
         del cands_ids ; gc.collect()
 
         update_record_dict_train(record_dict, curr_control, best_control, loss_cur, loss_best)

@@ -15,7 +15,7 @@ fi
 if [[ "${method}" == *"gcgens"* ]]; then
     end=100
 else
-    end=0
+    end=100
 fi
 
 start_time=$(date +%s)
